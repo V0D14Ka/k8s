@@ -1,0 +1,61 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: node-exporter
+  name: node-exporter
+spec:
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: node-exporter
+  template:
+    metadata:
+      labels:
+        app: node-exporter
+    spec:
+      containers:
+      - args:
+        - --web.listen-address=0.0.0.0:9100
+        - --path.procfs=/host/proc
+        - --path.sysfs=/host/sys
+        - --collector.filesystem.ignored-mount-points=^/(dev|proc|sys|var/lib/docker/.+)($|/)
+        - --collector.filesystem.ignored-fs-types=^(autofs|binfmt_misc|cgroup|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|sysfs|tracefs)$
+        image: prom/node-exporter:v1.1.2
+        imagePullPolicy: IfNotPresent
+        name: node-exporter
+        volumeMounts:
+        - mountPath: /host/proc
+          name: proc
+        - mountPath: /host/sys
+          name: sys
+        - mountPath: /host/root
+          name: root
+          readOnly: true
+      hostNetwork: true #использует сеть хоста (можно обращаться по IP ноды)
+      hostPID: true #имеет доступ к процессам хоста (для сбора метрик)
+      nodeSelector:
+        beta.kubernetes.io/os: linux #запускается только на нодах с ос линукс
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534 #запуск от непривилигированного пользователя nobody
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master #может запускаться на мастер ноде
+      volumes:
+      - hostPath:
+          path: /proc
+          type: ""
+        name: proc
+      - hostPath:
+          path: /sys
+          type: ""
+        name: sys
+      - hostPath:
+          path: /
+          type: ""
+        name: root
